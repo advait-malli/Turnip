@@ -1,9 +1,26 @@
 from github import Github
-import os, requests, zipfile, io, shutil, json
+import os, requests, zipfile, io, shutil, json, platform
+from pathlib import Path
 from github.GithubException import UnknownObjectException
 from colorama import init, Fore, Back, Style
 
-with open(rf'C:\turnip\config\cred.json', 'r') as file:
+# Initialize colorama for cross-platform colored output
+init(autoreset=True)
+
+# Determine the appropriate config path based on OS
+def get_config_path():
+    home = Path.home()
+    if platform.system() == "Windows":
+        config_dir = home / "turnip" / "config"
+    else:  # macOS and Linux
+        config_dir = home / ".config" / "turnip"
+    
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir / "cred.json"
+
+# Load credentials
+config_path = get_config_path()
+with open(config_path, 'r') as file:
     input_dict = json.load(file)
 for key, value in input_dict.items():
     globals()[key] = eval(value)
@@ -15,10 +32,18 @@ REPO_NAME = input(Fore.LIGHTMAGENTA_EX + f"\nGithub Repo: " + Fore.LIGHTBLACK_EX
 REPO_ADD = f"{USERNAME}/{REPO_NAME}"
 repo = g.get_repo(REPO_ADD)
 
-DOWNLOAD_FOLDER = r"C:\turnip\sync"
+# Determine the appropriate download folder based on OS
+def get_download_folder():
+    home = Path.home()
+    if platform.system() == "Windows":
+        download_dir = home / "turnip" / "sync"
+    else:  # macOS and Linux
+        download_dir = home / ".local" / "share" / "turnip" / "sync"
+    
+    download_dir.mkdir(parents=True, exist_ok=True)
+    return download_dir
 
-if not os.path.exists(DOWNLOAD_FOLDER):
-    os.makedirs(DOWNLOAD_FOLDER)
+DOWNLOAD_FOLDER = get_download_folder()
 
 # Download and extract the repository
 zip_url = f"https://github.com/{USERNAME}/{REPO_NAME}/archive/refs/heads/main.zip"
@@ -26,14 +51,14 @@ response = requests.get(zip_url)
 
 if response.status_code == 200:
     shutil.rmtree(DOWNLOAD_FOLDER, ignore_errors=True)
-    os.makedirs(DOWNLOAD_FOLDER)
+    DOWNLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
     with zipfile.ZipFile(io.BytesIO(response.content)) as zip_ref:
         zip_ref.extractall(DOWNLOAD_FOLDER)
 
     print(Fore.LIGHTMAGENTA_EX + f"\nTurnip:~" + Fore.LIGHTBLACK_EX + f" Repository '{REPO_ADD}' downloaded and extracted to {DOWNLOAD_FOLDER}." + Style.RESET_ALL)
-    folder = os.path.join(DOWNLOAD_FOLDER + f"\\{REPO_NAME}-main")
-    os.rename(folder, folder[:-5])
+    folder = DOWNLOAD_FOLDER / f"{REPO_NAME}-main"
+    folder.rename(DOWNLOAD_FOLDER / REPO_NAME)
 else:
     print(Fore.LIGHTMAGENTA_EX + f"\nTurnip:~" + Fore.LIGHTBLACK_EX + f" Failed to download repository. Status code: {response.status_code}" + Style.RESET_ALL)
 
@@ -61,12 +86,12 @@ def delete_github_folder(repo, path):
 def upload_files_to_github(local_folder, repo):
     """Upload or update files to GitHub."""
     local_files = set()
+    local_folder = Path(local_folder)
 
-    for root, dirs, files in os.walk(local_folder):
-        for file in files:
-            file_path = os.path.join(root, file)
-            relative_path = os.path.relpath(file_path, local_folder)
-            github_path = relative_path.replace("\\", "/")
+    for file_path in local_folder.rglob('*'):
+        if file_path.is_file():
+            relative_path = file_path.relative_to(local_folder)
+            github_path = relative_path.as_posix()  # Convert to forward slashes for GitHub
             local_files.add(github_path)
 
             try:
@@ -102,18 +127,19 @@ def upload_files_to_github(local_folder, repo):
 while True:
     cmd = input(Fore.LIGHTBLACK_EX + f"{REPO_ADD}"+ Style.RESET_ALL + Fore.LIGHTMAGENTA_EX + " | Turnip> " + Style.RESET_ALL)
     
+    upload_folder = DOWNLOAD_FOLDER / REPO_NAME
+    
     if cmd == "close":
-        upload_folder = DOWNLOAD_FOLDER + f"\\{REPO_NAME}"
         upload_files_to_github(upload_folder, repo)
         shutil.rmtree(upload_folder, ignore_errors=True)
         print(Fore.LIGHTMAGENTA_EX + f"\nTurnip:~" + Fore.LIGHTBLACK_EX + " Session closed\n" + Style.RESET_ALL)
         break
     elif cmd == "sync":
-        upload_files_to_github(DOWNLOAD_FOLDER + f"\\{REPO_NAME}", repo)
+        upload_files_to_github(upload_folder, repo)
     elif cmd == "close -dontsync":
-        upload_folder = DOWNLOAD_FOLDER + f"\\{REPO_NAME}"
         shutil.rmtree(upload_folder, ignore_errors=True)
         print(Fore.LIGHTMAGENTA_EX + f"\nTurnip:~" + Fore.LIGHTBLACK_EX + " Session closed without syncing to repo\n" + Style.RESET_ALL)
         break
     elif cmd.startswith("$"):
-        os.system(f"cd {DOWNLOAD_FOLDER + f"\\{REPO_NAME}"} && {cmd[1:]}")
+        os.chdir(upload_folder)
+        os.system(cmd[1:])
