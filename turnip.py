@@ -31,7 +31,7 @@ def print_banner():
     banner = f"""
 {Colors.MAGENTA}╭───────────────────────────────────────╮
 │                                       │
-│             {Colors.BOLD}Turnip{Colors.RESET}{Colors.MAGENTA}                │
+│               {Colors.BOLD}Turnip{Colors.RESET}{Colors.MAGENTA}                  │
 │         GitHub Sync Manager           │
 │                                       │
 ╰───────────────────────────────────────╯{Colors.RESET}
@@ -275,3 +275,4 @@ while True:
     else:
         os.chdir(upload_folder)
         os.system(cmd)
+
