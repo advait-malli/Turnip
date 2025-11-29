@@ -43,6 +43,7 @@ Enter your repository name when prompted, then use these commands:
 
 ## Support
 - Report issues on [GitHub Issues](https://github.com/advait-malli/Turnip/issues)
+- If you want to update your credentials on Turnip, you will need to edit the `cred.json` file.
 - Make sure your GitHub token has repo permissions
 
 ---
